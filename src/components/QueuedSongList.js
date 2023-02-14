@@ -2,24 +2,20 @@ import React from "react";
 import { Delete } from "@mui/icons-material";
 import { Avatar, IconButton, Typography } from "@mui/material";
 import useMediaQuery from '@mui/material/useMediaQuery';
+import { useMutation } from "@apollo/client";
+import { DELETE_QUEUED_SONG } from "../graphql/mutations";
 
-const QueuedSongList = () => {
+const QueuedSongList = ({ data }) => {
     const greaterThanMedium = useMediaQuery(theme => theme.breakpoints.up("md"));
-
-    const song = {
-        title: "Dummy Title",
-        artist: "Dummy Artist",
-        thumbnail: "https://customstorestorage.blob.core.windows.net/customstores/royalcoda_v4/images/cover.jpg"
-    }
 
     return (
         greaterThanMedium && (
             <div style={{ margin: "10px 0" }}>
             <Typography color="textSecondary" variant="button">
-                QUEUE (5)
+                QUEUE ({data.queued_song_list.length})
             </Typography>
-            {Array.from({ length: 5 }, () => song).map((song, i) => (
-                <QueuedSong key={i} song={song} />
+            {data.queued_song_list.map(song => (
+                <QueuedSong key={song.id} song={song} />
             ))}
         </div>
         )
@@ -27,7 +23,17 @@ const QueuedSongList = () => {
 }
 
 const QueuedSong = ({ song }) => {
-    const { thumbnail, artist, title } = song;
+    const { thumbnail, title, artist, id } = song;
+
+    const [deleteQueuedSong] = useMutation(DELETE_QUEUED_SONG);
+
+    const handleDeleteQueuedSong = async (id) => {
+        const data = await deleteQueuedSong({
+        variables: { id: id },
+        })
+    
+        console.log("delete queued song", data);
+      }
 
     return (
         <div style={{ display: "grid", gridAutoFLow: "column", gridTemplateColumns: "50px auto 40px", gridGap: 12, alignItems: "center", marginTop: 10, marginRight: 20 }}>
@@ -40,7 +46,7 @@ const QueuedSong = ({ song }) => {
                     {artist}
                 </Typography>
             </div>
-            <IconButton>
+            <IconButton onClick={() => handleDeleteQueuedSong(id)}>
                     <Delete color="error" />
             </IconButton>
         </div>

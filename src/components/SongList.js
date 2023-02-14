@@ -1,15 +1,13 @@
-import { PlayArrow, Save } from "@mui/icons-material";
+import React, { useContext, useEffect, useState } from "react";
+import { useSubscription, useMutation } from "@apollo/client";
+import { PlayArrow, Pause, Save } from "@mui/icons-material";
 import { CircularProgress, Card, CardMedia, CardContent, Typography, CardActions, IconButton } from "@mui/material";
-import React from "react";
+import { SongContext } from "../App";
+import { GET_SONGS } from "../graphql/subscriptions";
+import { ADD_QUEUED_SONG } from "../graphql/mutations";
 
 const SongList = () => {
-    let loading = false;
-
-    const song = {
-        title: "Dummy Title",
-        artist: "Dummy Artist",
-        thumbnail: "https://customstorestorage.blob.core.windows.net/customstores/royalcoda_v4/images/cover.jpg"
-    }
+    const { data, loading, error } = useSubscription(GET_SONGS);
 
     if (loading) {
         return (
@@ -18,13 +16,58 @@ const SongList = () => {
             </div>
         )
     }
-    return <div>{Array.from({ length: 10 }, () => song).map((song, i) => (
-        <Song key={i} song={song}/>
+
+    if (error) return <div>Error fetching songs</div>
+
+    return <div>{data.songs_list.map(song => (
+        <Song key={song.id} song={song}/>
     ))}</div>
 }
 
-function Song({ song }) {
+const Song = ({ song }) => {
+    const [addQueuedSong, { queuedSongError }] = useMutation(ADD_QUEUED_SONG);
+
+    if (queuedSongError) {
+        console.error(queuedSongError);
+    }
+
+    const { id } = song;
+    const { state, dispatch } = useContext(SongContext);
+    const [currentSongPlaying, setCurrentSongPlaying] = useState(false);
     const { title, artist, thumbnail } = song;
+
+    useEffect(() => {
+        const isSongPlaying = state.isPlaying && id === state.song.id;
+
+        setCurrentSongPlaying(isSongPlaying);
+
+    }, [id, state.song.id, state.isPlaying]);
+
+    const handleAddSongToQueue = async () => {
+        try {
+            const { url, thumbnail, duration, title, artist } = song;
+
+            await addQueuedSong({
+                variables: {
+                    url: url.length > 0 ? url : null,
+                    thumbnail: thumbnail.length > 0 ? thumbnail : null,
+                    duration: duration > 0 ? duration : null,
+                    title: title.length > 0 ? title : null,
+                    artist: artist.length > 0 ? artist : null
+                },
+            })
+
+        } catch (err) {
+            console.error("error adding queued song: ", err);
+        }
+    }
+
+    const handleTogglePlay = () => {
+        dispatch({ type: "SET_SONG", payload: { song }});
+
+        dispatch(state.isPlaying ? {type: "PAUSE_SONG" } : { type: "PLAY_SONG" });
+    }
+
     return <Card spacing={3} style={{ marginBottom: 20, borderRadius: 10 }}>
         <div style={{ display: "flex", alignItems: "center" }}>
             <CardMedia image={thumbnail} style={{ objectFit: "cover", width: 140, height: 140 }}/>
@@ -38,10 +81,10 @@ function Song({ song }) {
                     </Typography>
                 </CardContent>
                 <CardActions>
-                    <IconButton size="small" color="primary">
-                        <PlayArrow />
+                    <IconButton onClick={handleTogglePlay} size="small" color="primary">
+                        {currentSongPlaying ? <Pause /> : <PlayArrow />}
                     </IconButton>
-                    <IconButton size="small" color="secondary">
+                    <IconButton onClick={handleAddSongToQueue} size="small" color="secondary">
                         <Save />
                     </IconButton>
                 </CardActions>
